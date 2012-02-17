@@ -1,0 +1,85 @@
+#! /usr/bin/env python
+
+# This file is part of release-path
+#
+#Copyright (c) 2012 Wireless Generation, Inc.
+#
+#Permission is hereby granted, free of charge, to any person obtaining a copy
+#of this software and associated documentation files (the "Software"), to deal
+#in the Software without restriction, including without limitation the rights
+#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#copies of the Software, and to permit persons to whom the Software is
+#furnished to do so, subject to the following conditions:
+#
+#The above copyright notice and this permission notice shall be included in
+#all copies or substantial portions of the Software.
+#
+#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+#THE SOFTWARE.
+
+
+import sys
+import logging
+from argparse import ArgumentParser
+from simpleversions import Version
+from release_path import (release_branches, merge_branches,)
+from git import Repo
+
+def argparser():
+    parser = ArgumentParser()
+    parser.add_argument('--no-push', dest='push', action='store_false', default=True)
+    parser.add_argument('--push', dest='push', action='store_true', default=True)
+    parser.add_argument('--extra-branches', nargs='*', default=[])
+    parser.add_argument('--remote', default='origin')
+    parser.add_argument('--no-fetch', dest='fetch', action='store_false', default=True)
+    parser.add_argument('--fetch', dest='fetch', action='store_true', default=True)
+    parser.add_argument('--max-branch', type=Version, default=None)
+    parser.add_argument('--min-branch', type=Version, default=None)
+    parser.add_argument('--branch-prefix', default='release_')
+    parser.add_argument('--branch-suffix', default='')
+    return parser
+
+
+
+
+def main():
+    logging.basicConfig(level=logging.INFO)
+    args = argparser().parse_args()
+    repo = Repo()
+    
+    if args.fetch:
+        repo.git.fetch()
+    
+    repo.git.remote('prune', args.remote)
+
+    def valid_branch(branch):
+        branch_version = Version(branch)
+        return ((not args.min_branch or branch_version >= args.min_branch) and
+                (not args.max_branch or branch_version <= args.max_branch))
+
+
+    branches = sorted(release_branches(repo, args.remote, args.branch_prefix, args.branch_suffix), key=Version)
+    branches = [branch for branch in branches if valid_branch(branch)]
+    branches.extend(args.extra_branches)
+
+    failed_merges = merge_branches(repo, branches, args.remote, args.push, args.fetch)
+    
+    if failed_merges:
+        logging.info("The following merges failed:")
+        for from_branch, to_branch in failed_merges:
+            logging.info('->'.join([from_branch, to_branch]))
+            logging.info('Commits:')
+            for log_line in repo.git.log(to_branch + '..' + from_branch,
+                '--format=%h - %an - %s').split('\n'):
+                
+                logging.info('    ' + log_line)
+
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main())

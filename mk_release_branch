@@ -1,0 +1,87 @@
+#! /usr/bin/env python
+
+# This file is part of release-path
+#
+#Copyright (c) 2012 Wireless Generation, Inc.
+#
+#Permission is hereby granted, free of charge, to any person obtaining a copy
+#of this software and associated documentation files (the "Software"), to deal
+#in the Software without restriction, including without limitation the rights
+#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#copies of the Software, and to permit persons to whom the Software is
+#furnished to do so, subject to the following conditions:
+#
+#The above copyright notice and this permission notice shall be included in
+#all copies or substantial portions of the Software.
+#
+#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+#THE SOFTWARE.
+
+import sys
+
+from argparse import ArgumentParser
+from git import Repo
+from release_path import (
+    create_release_branch, release_branches, verify_submodule_branch_structure
+)
+
+
+def argparser():
+    parser = ArgumentParser()
+    parser.add_argument('version', help='A simpleversion version specifier')
+    parser.add_argument('--no-push', dest='push', action='store_false', default=True,
+        help="Don't push the new branch to the remote")
+    parser.add_argument('--push', dest='push', action='store_true', default=True,
+        help="Push the newly created branch to the remote")
+    parser.add_argument('--remote', default='origin',
+        help="Remote to push and fetch from. (default: %(default)s)")
+    parser.add_argument('--no-fetch', dest='fetch', action='store_false', default=True,
+        help="Don't fetch branches from the remote")
+    parser.add_argument('--fetch', dest='fetch', action='store_true', default=True,
+        help="Fetch branches from the remote")
+    parser.add_argument('--branch-prefix', default='release_', metavar='pref',
+        help="Prefix identifying release branches. (default: '%(default)s')")
+    parser.add_argument('--branch-suffix', default='', metavar='suff',
+        help="Suffix identifying release branches. (default: '%(default)s')")
+    return parser
+
+
+def main():
+    args = argparser().parse_args()
+    repo = Repo()
+
+    repo.git.remote('prune', args.remote)
+
+    for branch in release_branches(repo, args.remote,
+            args.branch_prefix, args.branch_suffix):
+        verify_submodule_branch_structure(repo, branch, args.fetch)
+
+    branch_point, branch_name = create_release_branch(
+        repo, args.version, args.remote,
+        args.branch_prefix, args.branch_suffix)
+
+    print "Created new branch {branch_name} from {remote}/{branch_point}".format(
+        branch_name=branch_name,
+        branch_point=branch_point,
+        remote=args.remote
+    )
+    if args.push:
+        print "Pushing {branch_name} to {remote}".format(
+            branch_name=branch_name,
+            remote=args.remote
+        )
+        repo.git.push(args.remote, branch_name)
+        repo.git.submodule('foreach', 'git push {remote} {branch}'.format(
+            remote=args.remote,
+            branch=branch_name
+        ))
+
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main())

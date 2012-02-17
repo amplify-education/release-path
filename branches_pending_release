@@ -1,0 +1,139 @@
+#! /usr/bin/env python
+
+# This file is part of release-path
+#
+#Copyright (c) 2012 Wireless Generation, Inc.
+#
+#Permission is hereby granted, free of charge, to any person obtaining a copy
+#of this software and associated documentation files (the "Software"), to deal
+#in the Software without restriction, including without limitation the rights
+#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#copies of the Software, and to permit persons to whom the Software is
+#furnished to do so, subject to the following conditions:
+#
+#The above copyright notice and this permission notice shall be included in
+#all copies or substantial portions of the Software.
+#
+#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+#THE SOFTWARE.
+
+import git
+import os
+from itertools import groupby
+from argparse import ArgumentParser
+
+class PendingRelease(object):
+    def __init__(self, repo,
+            release_path=['master', 'next'],
+            remote='origin',
+            ignore_branches=['master', 'next', 'master-deploy', 'next-deploy'],
+            show_owners = False):
+        self.repo = repo
+        self.release_path = [remote+'/'+branch for branch in release_path]
+        self.show_owners = show_owners
+        self.remote = remote
+        self.ignore_branches = [remote+'/'+branch for branch in ignore_branches]
+        self.all_branches = set(self.format_branches(self.repo.git.branch('-r')))
+        self.release_path_sets = [self.in_branch(branch) for branch in self.release_path]
+
+    def format_branches(self, branch_list):
+        return [b for b in (b.strip() for b in branch_list.split('\n'))
+                if (self.remote in b
+                    and '->' not in b
+                    and b not in self.ignore_branches)]
+
+    def in_branch(self, branch):
+        return set(self.format_branches(self.repo.git.branch('-r', '--merged', branch)))
+
+    def containment_list(self):
+        for branch in sorted(self.all_branches):
+            yield branch, [branch in branch_set for branch_set in self.release_path_sets]
+
+    def owners_relative_to(self, branch, base_branch):
+        raw_committers = self.repo.git.log('{base}..{branch}'.format(base = base_branch, branch = branch),
+                                  '--format=%ae')
+        committers = [committer.strip() for committer in raw_committers.split('\n') if committer.strip() != '']
+        if not committers:
+            committers = [self.repo.git.log(branch, '--format=%ae', '-n1').strip()]
+        return sorted(((len(list(g)), k) for k, g in groupby(sorted(committers))), reverse = True)
+
+    def grouped(self):
+
+        def format_branch(branch):
+            formatted = "  " + branch
+            if self.show_owners:
+                owners = self.owners_relative_to(branch, self.release_path[0])
+                if owners:
+                    formatted = formatted + "\n    Owner: " + owners[0][1]
+            return formatted
+
+        yield "Branches that have been merged to " + self.release_path[0]
+        yield "These can probably be deleted"
+        for branch in sorted(self.release_path_sets[0]):
+            yield format_branch(branch)
+        yield ""
+
+        for (primary, primary_set, secondary, secondary_set) in \
+                zip(self.release_path, self.release_path_sets, self.release_path[1:], self.release_path_sets[1:]):
+            yield "Branches that have been merged to {s} but not to {p}:".format(
+                    p = primary, s = secondary)
+            for branch in sorted(secondary_set - primary_set):
+                yield format_branch(branch)
+            yield ""
+
+        yield "Branches that have changes that haven't been merged to " + self.release_path[-1]
+        for branch in sorted(self.all_branches - self.release_path_sets[-1]):
+            yield format_branch(branch)
+        yield ""
+
+        yield ""
+        yield "To find out what changes are on a branch 'origin/foo' that aren't"
+        yield "on 'origin/next', use the command:"
+        yield ""
+        yield "git log origin/next..origin/foo"
+        yield ""
+
+    def porcelain(self):
+        for branch, contained_in in self.containment_list():
+            formatted = "{ids} {branch}".format(
+                ids = ''.join(release_element.upper()[len(self.remote)+1] if contained else ' '
+                              for release_element, contained
+                              in zip(self.release_path, contained_in)),
+                branch = branch)
+            if self.show_owners:
+                owners = self.owners_relative_to(branch, self.release_path[0])
+                if owners:
+                    formatted = formatted + " " + owners[0][1] if self.show_owners else ''
+            yield formatted
+
+def argparser():
+    parser = ArgumentParser()
+    parser.add_argument('-p', '--porcelain', action='store_true', help="Display pending branches in an easily parsable format")
+    parser.add_argument('-r', '--repo', default=os.getcwd(), help="Use a repo other than the current working directory")
+    parser.add_argument('--release-path', nargs = '+', metavar = "BRANCH", default=['master', 'next'], help="An ordered list (starting closest to production) of branches that changes go to on their way to release")
+    parser.add_argument('--show-owners', action='store_true', help="Display the most likely owner of the branch")
+    parser.add_argument('--remote', default='origin', help="The remote to use")
+    parser.add_argument('--ignore-branches', nargs = '*', metavar = "BRANCH", default=['master', 'next', 'master-deploy', 'next-deploy'], help="A list of branches to ignore in all output")
+    return parser
+
+def main():
+    args = argparser().parse_args()
+
+    repo = git.Repo(args.repo)
+    pending = PendingRelease(repo, args.release_path, args.remote, args.ignore_branches, args.show_owners)
+
+    if args.porcelain:
+        lines = pending.porcelain()
+    else:
+        lines = pending.grouped()
+
+    for line in lines:
+        print line
+
+if __name__ == '__main__':
+    main()
