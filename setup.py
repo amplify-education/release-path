@@ -12,6 +12,7 @@ setup(
              'deep_merge',
              'merge_release_branches',
              'mk_release_branch'],
+    py_modules=['release_path'],
     setup_requires=['nose'],
     install_requires=[
         'simpleversions==0.1.2',
