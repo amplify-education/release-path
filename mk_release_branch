@@ -70,6 +70,12 @@ def main():
         branch_point=branch_point,
         remote=args.remote
     )
+
+    #Put in a bogus commit to ID the new branch
+    repo.git.checkout(branch_name)
+    repo.git.commit('-m branchid: %s' % branch_name, '--allow-empty')
+    repo.git.checkout(branch_point)
+
     if args.push:
         print "Pushing {branch_name} to {remote}".format(
             branch_name=branch_name,
@@ -80,6 +86,11 @@ def main():
             remote=args.remote,
             branch=branch_name
         ))
+
+        #push out the bogus commit
+        repo.git.checkout(branch_name)
+        repo.git.push()
+        repo.git.checkout(branch_point)
 
     return 0
 
