@@ -28,18 +28,21 @@ from itertools import groupby
 from argparse import ArgumentParser
 
 class PendingRelease(object):
-    def __init__(self, repo,
-            release_path=['master', 'next'],
-            remote='origin',
-            ignore_branches=['master', 'next', 'master-deploy', 'next-deploy'],
-            show_owners = False):
+    def __init__(self, repo, release_path=None, remote='origin',
+                 ignore_branches=None, show_owners=False):
         self.repo = repo
-        self.release_path = [remote+'/'+branch for branch in release_path]
+        self.release_path = ["%s/%s" % (remote, branch)
+                             for branch in release_path or ['master', 'next']]
         self.show_owners = show_owners
         self.remote = remote
-        self.ignore_branches = [remote+'/'+branch for branch in ignore_branches]
-        self.all_branches = set(self.format_branches(self.repo.git.branch('-r')))
-        self.release_path_sets = [self.in_branch(branch) for branch in self.release_path]
+        self.ignore_branches = [
+            "%s/%s" % (remote, branch)
+            for branch in ignore_branches or
+            ['master', 'next', 'master-deploy', 'next-deploy']]
+        self.all_branches = \
+            set(self.format_branches(self.repo.git.branch('-r')))
+        self.release_path_sets = [self.in_branch(branch)
+                                  for branch in self.release_path]
 
     def format_branches(self, branch_list):
         return [b for b in (b.strip() for b in branch_list.split('\n'))
@@ -48,22 +51,27 @@ class PendingRelease(object):
                     and b not in self.ignore_branches)]
 
     def in_branch(self, branch):
-        return set(self.format_branches(self.repo.git.branch('-r', '--merged', branch)))
+        return set(self.format_branches(self.repo.git.branch('-r', '--merged',
+                                                             branch)))
 
     def containment_list(self):
         for branch in sorted(self.all_branches):
-            yield branch, [branch in branch_set for branch_set in self.release_path_sets]
+            yield branch, [branch in branch_set
+                           for branch_set in self.release_path_sets]
 
     def owners_relative_to(self, branch, base_branch):
-        raw_committers = self.repo.git.log('{base}..{branch}'.format(base = base_branch, branch = branch),
-                                  '--format=%ae')
-        committers = [committer.strip() for committer in raw_committers.split('\n') if committer.strip() != '']
+        raw_committers = self.repo.git.log('%s..%s' % (base_branch, branch),
+                                           '--format=%ae')
+        committers = [committer.strip()
+                      for committer in raw_committers.split('\n')
+                      if committer.strip() != '']
         if not committers:
-            committers = [self.repo.git.log(branch, '--format=%ae', '-n1').strip()]
-        return sorted(((len(list(g)), k) for k, g in groupby(sorted(committers))), reverse = True)
+            committers = [self.repo.git.log(branch,
+                                            '--format=%ae', '-n1').strip()]
+        return sorted(((len(list(g)), k)
+                       for k, g in groupby(sorted(committers))), reverse=True)
 
     def grouped(self):
-
         def format_branch(branch):
             formatted = "  " + branch
             if self.show_owners:
@@ -72,60 +80,87 @@ class PendingRelease(object):
                     formatted = formatted + "\n    Owner: " + owners[0][1]
             return formatted
 
-        yield "Branches that have been merged to " + self.release_path[0]
-        yield "These can probably be deleted"
+        rv = []
+
+        rv.append("Branches that have been merged to %s" %
+                  self.release_path[0])
+        rv.append("These can probably be deleted")
         for branch in sorted(self.release_path_sets[0]):
-            yield format_branch(branch)
-        yield ""
+            rv.append(format_branch(branch))
+        rv.append("")
 
         for (primary, primary_set, secondary, secondary_set) in \
-                zip(self.release_path, self.release_path_sets, self.release_path[1:], self.release_path_sets[1:]):
-            yield "Branches that have been merged to {s} but not to {p}:".format(
-                    p = primary, s = secondary)
+                zip(self.release_path, self.release_path_sets,
+                    self.release_path[1:], self.release_path_sets[1:]):
+            rv.append("Branches that have been merged to %s but not to %s:" %
+                      (secondary, primary))
             for branch in sorted(secondary_set - primary_set):
-                yield format_branch(branch)
-            yield ""
+                rv.append(format_branch(branch))
+            rv.append("")
 
-        yield "Branches that have changes that haven't been merged to " + self.release_path[-1]
+        rv.append("Branches that have changes that haven't been merged to %s" %
+                  self.release_path[-1])
         for branch in sorted(self.all_branches - self.release_path_sets[-1]):
-            yield format_branch(branch)
-        yield ""
+            rv.append(format_branch(branch))
+        rv.append("")
 
-        yield ""
-        yield "To find out what changes are on a branch 'origin/foo' that aren't"
-        yield "on 'origin/next', use the command:"
-        yield ""
-        yield "git log origin/next..origin/foo"
-        yield ""
+        rv.append("""
+To find out what changes are on a branch 'origin/foo' that aren't
+on 'origin/next', use the command:
+
+    git log origin/next..origin/foo
+
+""")
+        return rv
 
     def porcelain(self):
+        lines = []
         for branch, contained_in in self.containment_list():
-            formatted = "{ids} {branch}".format(
-                ids = ''.join(release_element.upper()[len(self.remote)+1] if contained else ' '
-                              for release_element, contained
-                              in zip(self.release_path, contained_in)),
-                branch = branch)
+            branches = []
+            for release_element, contained in \
+                    zip(self.release_path, contained_in)):
+                if contained:
+                    branches.append(
+                        release_element.upper()[len(self.remote) + 1])
+                else:
+                    branches.append(' ')
+
+            formatted = "%s %s" % (''.join(branches), branch)
             if self.show_owners:
                 owners = self.owners_relative_to(branch, self.release_path[0])
                 if owners:
-                    formatted = formatted + " " + owners[0][1] if self.show_owners else ''
-            yield formatted
+                    formatted = formatted + " " + owners[0][1]
+            lines.append(formatted)
+        return lines
 
 def argparser():
     parser = ArgumentParser()
-    parser.add_argument('-p', '--porcelain', action='store_true', help="Display pending branches in an easily parsable format")
-    parser.add_argument('-r', '--repo', default=os.getcwd(), help="Use a repo other than the current working directory")
-    parser.add_argument('--release-path', nargs = '+', metavar = "BRANCH", default=['master', 'next'], help="An ordered list (starting closest to production) of branches that changes go to on their way to release")
-    parser.add_argument('--show-owners', action='store_true', help="Display the most likely owner of the branch")
+    parser.add_argument(
+        '-p', '--porcelain', action='store_true',
+        help="Display pending branches in an easily parsable format")
+    parser.add_argument(
+        '-r', '--repo', default=os.getcwd(),
+        help="Use a repo other than the current working directory")
+    parser.add_argument(
+        '--release-path', nargs='+', metavar="BRANCH",
+        default=['master', 'next'],
+        help="An ordered list (starting closest to production) of branches that changes go to on their way to release")
+    parser.add_argument(
+        '--show-owners', action='store_true',
+        help="Display the most likely owner of the branch")
     parser.add_argument('--remote', default='origin', help="The remote to use")
-    parser.add_argument('--ignore-branches', nargs = '*', metavar = "BRANCH", default=['master', 'next', 'master-deploy', 'next-deploy'], help="A list of branches to ignore in all output")
+    parser.add_argument(
+        '--ignore-branches', nargs='*', metavar="BRANCH",
+        default=['master', 'next', 'master-deploy', 'next-deploy'],
+        help="A list of branches to ignore in all output")
     return parser
 
 def main():
     args = argparser().parse_args()
 
     repo = git.Repo(args.repo)
-    pending = PendingRelease(repo, args.release_path, args.remote, args.ignore_branches, args.show_owners)
+    pending = PendingRelease(repo, args.release_path, args.remote,
+                             args.ignore_branches, args.show_owners)
 
     if args.porcelain:
         lines = pending.porcelain()

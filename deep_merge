@@ -26,10 +26,8 @@
 from argparse import ArgumentParser
 from git import Repo
 import sys
-from release_path import (
-    verify_submodule_branch_structure, fast_forward_deep_merge,
-    no_ff_deep_merge, deep_merge
-)
+from release_path import verify_submodule_branch_structure, \
+    fast_forward_deep_merge, no_ff_deep_merge, deep_merge
 
 
 def argparser():
@@ -55,7 +53,7 @@ def main():
     # Verify that the submodules have the correct branch structure
     for branch in [args.from_branch, args.to_branch]:
         verify_submodule_branch_structure(repo, branch, not args.no_fetch)
-    
+
     if args.ff_only:
         fast_forward_deep_merge(repo, args.from_branch, args.to_branch)
     elif args.no_ff:

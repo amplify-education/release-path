@@ -22,22 +22,25 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 
-
 import sys
 import logging
 from argparse import ArgumentParser
 from simpleversions import Version
-from release_path import (release_branches, merge_branches,)
+from release_path import release_branches, merge_branches
 from git import Repo
 
 def argparser():
     parser = ArgumentParser()
-    parser.add_argument('--no-push', dest='push', action='store_false', default=True)
-    parser.add_argument('--push', dest='push', action='store_true', default=True)
+    parser.add_argument('--no-push', dest='push', action='store_false',
+                        default=True)
+    parser.add_argument('--push', dest='push', action='store_true',
+                        default=True)
     parser.add_argument('--extra-branches', nargs='*', default=[])
     parser.add_argument('--remote', default='origin')
-    parser.add_argument('--no-fetch', dest='fetch', action='store_false', default=True)
-    parser.add_argument('--fetch', dest='fetch', action='store_true', default=True)
+    parser.add_argument('--no-fetch', dest='fetch', action='store_false',
+                        default=True)
+    parser.add_argument('--fetch', dest='fetch', action='store_true',
+                        default=True)
     parser.add_argument('--max-branch', type=Version, default=None)
     parser.add_argument('--min-branch', type=Version, default=None)
     parser.add_argument('--branch-prefix', default='release_')
@@ -45,16 +48,14 @@ def argparser():
     return parser
 
 
-
-
 def main():
     logging.basicConfig(level=logging.INFO)
     args = argparser().parse_args()
     repo = Repo()
-    
+
     if args.fetch:
         repo.git.fetch()
-    
+
     repo.git.remote('prune', args.remote)
 
     def valid_branch(branch):
@@ -63,22 +64,22 @@ def main():
                 (not args.max_branch or branch_version <= args.max_branch))
 
 
-    branches = sorted(release_branches(repo, args.remote, args.branch_prefix, args.branch_suffix), key=Version)
+    branches = sorted(release_branches(repo, args.remote, args.branch_prefix,
+                                       args.branch_suffix), key=Version)
     branches = [branch for branch in branches if valid_branch(branch)]
     branches.extend(args.extra_branches)
 
-    failed_merges = merge_branches(repo, branches, args.remote, args.push, args.fetch)
-    
+    failed_merges = merge_branches(repo, branches, args.remote, args.push,
+                                   args.fetch)
+
     if failed_merges:
         logging.info("The following merges failed:")
         for from_branch, to_branch in failed_merges:
             logging.info('->'.join([from_branch, to_branch]))
             logging.info('Commits:')
-            for log_line in repo.git.log(to_branch + '..' + from_branch,
-                '--format=%h - %an - %s').split('\n'):
-                
+            for log_line in repo.git.log("%s..%s" % (to_branch, from_branch),
+                                         '--format=%h - %an - %s').split('\n'):
                 logging.info('    ' + log_line)
-
         return 1
 
 if __name__ == "__main__":
