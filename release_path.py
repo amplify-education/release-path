@@ -21,6 +21,7 @@
 #THE SOFTWARE.
 
 import re
+import sys
 import logging
 from git import GitCommandError
 from simpleversions import Version
@@ -121,9 +122,10 @@ def merge_branches(repo, branches, remote='origin', push=True, fetch=True):
             if push:
                 repo.git.push(remote, to_branch)
 
-        except GitCommandError as exc:
+        except GitCommandError:
             logging.exception('Failed to merge %s into %s\nStderr:\n%s' %
-                              (from_branch, to_branch, exc.stderr))
+                              (from_branch, to_branch,
+                               sys.exc_info()[1].stderr))
             failed_merges.append((from_branch, to_branch))
 
     return failed_merges

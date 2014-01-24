@@ -15,6 +15,6 @@ setup(
     install_requires=[
         'simpleversions==0.1.2',
         'argparse',
-        'GitPython==0.1.6',
+        'GitPython',
     ],
 )
