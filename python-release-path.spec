@@ -4,7 +4,7 @@ Release: 3
 Summary: Tools for managing a release-branch based git workflow
 License: MIT
 Group: Development/Libraries
-Url: https://github.com/wgen/release-path
+Url: https://github.com/amplify-education/release-path
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 Source0: %{name}-%{version}.tar.gz
 BuildArch: noarch

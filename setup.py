@@ -6,8 +6,6 @@ setup(
     name="release_path",
     version="0.1",
     description="Tools to manage a git release path",
-    author="Calen Pennington",
-    author_email="cpennington@wgen.net",
     scripts=['branches_pending_release',
              'deep_merge',
              'merge_release_branches',
