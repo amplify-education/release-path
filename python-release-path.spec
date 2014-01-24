@@ -1,6 +1,6 @@
 Name: python-release-path
-Version: 0.1.1
-Release: 3
+Version: 0.1.2
+Release: 1
 Summary: Tools for managing a release-branch based git workflow
 License: MIT
 Group: Development/Libraries

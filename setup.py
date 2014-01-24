@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name="release_path",
-    version="0.1",
+    version="0.1.2",
     description="Tools to manage a git release path",
     scripts=['branches_pending_release',
              'deep_merge',
