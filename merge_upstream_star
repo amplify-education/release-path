@@ -1,0 +1,52 @@
+#!/usr/bin/python
+
+import logging
+import sys
+from git import GitCommandError
+
+from release_branch_manager import init_script, find_branches, find_product_emails, save_failure_info
+from release_path import deep_merge
+
+def main():
+    (args, config, repo) = init_script()
+    (source_branch, downstream_deploy_branch, project_branches) = find_branches(args, repo)
+    # these file names should either be in the config file or in the command-line
+    # but for now they're hard-coded so I can get the thing running
+    project_list_filename = "project_list"
+    email_list_filename = "email_recipients"
+
+    # First, merge to the downstream deploy branch: if that fails, terminate and
+    # yell at everybody
+    logging.debug("Merging from %s to %s" % (source_branch, downstream_deploy_branch))
+    try:
+        deep_merge(repo, source_branch, downstream_deploy_branch)
+    except GitCommandError as e:
+        logging.error(e)
+        # it would be nice to include the diff in the error email, but we can't
+        # (see below)
+        return 1
+
+    # Then, if that succeeded, merge to each project branch: if those fail,
+    # we just want to yell at specific people
+    logging.debug("Merging from %s to %s" % (source_branch, project_branches))
+    failed_branches = []
+    for to_branch in project_branches:
+        print "Merging from %s into %s" % (source_branch, to_branch)
+        try:
+            deep_merge(repo, source_branch, to_branch)
+        except GitCommandError as e:
+            logging.error(e)
+            # NOTE: this is currently useless because deep_merge does a hard-reset
+            # before raising an exception, effectively making it impossible to
+            # diagnose problems.  This would be nice to fix.
+            failed_branches.append( (to_branch,repo.git.diff()) )
+    else:
+        logging.debug("Skipped project-branch merge, since no branches were found")
+    if failed_branches:
+        save_failure_info(failed_branches, config, email_list_filename, project_list_filename)
+    else:
+        logging.debug("No project-merge failures!")
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

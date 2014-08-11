@@ -1,0 +1,21 @@
+#!/usr/bin/python
+
+import sys
+import logging
+from release_path import deep_merge
+from release_branch_manager import init_script, find_upstream_branch
+
+def main():
+    (args, config, repo) = init_script()
+    source_branch = args.source_branch
+    while True:
+        upstream = find_upstream_branch(repo, source_branch)
+        if not upstream:
+            logging.info("No further upstream branch found after %s" % source_branch)
+            break
+        logging.info("Merging %s into %s" % (source_branch, upstream))
+        deep_merge(repo, source_branch, upstream)
+        source_branch = upstream
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,30 @@
+#!/usr/bin/python
+
+from release_branch_manager import IllegalCommitException, init_script, check_guard_commits, find_branch_type
+import logging
+from git import Repo
+import sys
+
+def main():
+    (args, config, repo) = init_script()
+    # can be passed in directly:
+    branchtype = args.source_branch_type
+    # or can be inferred:
+    if branchtype is None:
+        src = args.source_branch
+        branchtype = find_branch_type(src)
+    # since we fetch by refspec, not everything may be up to date, which means
+    # updates to guards can cause the build to fail:
+    logging.debug("fetching from upstream without restriction")
+    fetch_output = repo.git.fetch()
+    logging.debug(fetch_output)
+    try:
+        check_guard_commits(repo, config, branchtype)
+    except IllegalCommitException as e:
+        print e
+        return 1
+    logging.info("No guard commits found in history: OK to merge.")
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

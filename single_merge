@@ -1,0 +1,16 @@
+#!/usr/bin/python
+
+from release_path import deep_merge
+from release_branch_manager import init_script, find_branches
+
+import logging
+import sys
+
+def main():
+    (args, config, repo) = init_script()
+    (src, dest, _ignoreme) = find_branches(args, repo)
+    logging.info("Deep merging %s into %s" % (src, dest))
+    deep_merge(repo, src, dest) # throws an exception if it fails: call it a day
+
+if __name__ == "__main__":
+    sys.exit(main())
