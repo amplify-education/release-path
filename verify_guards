@@ -1,0 +1,52 @@
+#!/usr/bin/python
+
+# This file is part of release-path
+#
+#Copyright (c) 2014 Amplify Education
+#
+#Permission is hereby granted, free of charge, to any person obtaining a copy
+#of this software and associated documentation files (the "Software"), to deal
+#in the Software without restriction, including without limitation the rights
+#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#copies of the Software, and to permit persons to whom the Software is
+#furnished to do so, subject to the following conditions:
+#
+#The above copyright notice and this permission notice shall be included in
+#all copies or substantial portions of the Software.
+#
+#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+#THE SOFTWARE.
+
+from release_branch_manager import IllegalCommitException, init_script, check_guard_commits, find_branch_type
+import logging
+from git import Repo
+import sys
+
+def main():
+    (args, config, repo) = init_script()
+    # can be passed in directly:
+    branchtype = args.source_branch_type
+    # or can be inferred:
+    if branchtype is None:
+        src = args.source_branch
+        branchtype = find_branch_type(src)
+    # since we fetch by refspec, not everything may be up to date, which means
+    # updates to guards can cause the build to fail:
+    logging.debug("fetching from upstream without restriction")
+    fetch_output = repo.git.fetch()
+    logging.debug(fetch_output)
+    try:
+        check_guard_commits(repo, config, branchtype)
+    except IllegalCommitException as e:
+        print e
+        return 1
+    logging.info("No guard commits found in history: OK to merge.")
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())
