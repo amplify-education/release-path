@@ -50,13 +50,13 @@ def main():
                 deep_merge(repo, product_branch, upstream_branch)
             else:
                 print "No upstream branch found for %s" % product_branch
-        except GitCommandError as e:
+        except GitCommandError, e: # "as" requires python 2.6
             logging.error(e)
             # NOTE: this is currently useless because deep_merge does a hard-reset
             # before raising an exception, effectively making it impossible to
             # diagnose problems.  This would be nice to fix.
             failed_branches.append( (upstream_branch, repo.git.diff()) )
-        except InvalidBranchException as e:
+        except InvalidBranchException, e: # "as" requires python 2.6
             failed_branches.append((upstream_branch, "Error finding upstream branch"))
     if failed_branches:
         save_failure_info(failed_branches, config,

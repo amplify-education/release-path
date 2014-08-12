@@ -42,7 +42,7 @@ def main():
     logging.debug(fetch_output)
     try:
         check_guard_commits(repo, config, branchtype)
-    except IllegalCommitException as e:
+    except IllegalCommitException, e: # "as" requires python 2.6
         print e
         return 1
     logging.info("No guard commits found in history: OK to merge.")

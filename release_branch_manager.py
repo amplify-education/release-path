@@ -212,7 +212,10 @@ def find_upstream_branch(repo, source_branch, remote=DEFAULT_REMOTE):
 
 def find_remote_branches(repo, remote=DEFAULT_REMOTE,pattern=None):
     remote_prefix = "refs/remotes/%s/" % (remote)
-    search_pattern = remote_prefix if pattern is None else remote_prefix + pattern
+    if pattern is None: # one-line version of this block is not python2.4 compatible
+        search_pattern = remote_prefix
+    else:
+        search_pattern = remote_prefix + pattern
     command_output = repo.git.for_each_ref(search_pattern, "--format=%(refname)");
     if command_output:
         raw_branches = command_output.split("\n")

@@ -42,7 +42,7 @@ def main():
     logging.debug("Merging from %s to %s" % (source_branch, downstream_deploy_branch))
     try:
         deep_merge(repo, source_branch, downstream_deploy_branch)
-    except GitCommandError as e:
+    except GitCommandError, e: # "as" requires python 2.6
         logging.error(e)
         # it would be nice to include the diff in the error email, but we can't
         # (see below)
@@ -56,7 +56,7 @@ def main():
         print "Merging from %s into %s" % (source_branch, to_branch)
         try:
             deep_merge(repo, source_branch, to_branch)
-        except GitCommandError as e:
+        except GitCommandError, e: # "as" requires python 2.6
             logging.error(e)
             # NOTE: this is currently useless because deep_merge does a hard-reset
             # before raising an exception, effectively making it impossible to
