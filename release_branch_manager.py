@@ -36,7 +36,7 @@ DEPLOY_NAMESPACE="deploy"
 DEFAULT_REMOTE="origin"
 DEFAULT_CONFIG="upstream_merge.conf"
 
-class BRANCH_TYPE():
+class BRANCH_TYPE(object):
     PRODUCTION = "production"
     PREPROD = "preprod"
     CQA = "current"
