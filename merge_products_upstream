@@ -25,7 +25,7 @@
 import sys
 import logging
 from git import GitCommandError
-from release_branch_manager import init_script, find_product_branches, find_upstream_branch, InvalidBranchException
+from release_branch_manager import init_script, find_product_branches, find_upstream_branch, save_failure_info, InvalidBranchException
 from release_path import deep_merge
 
 def main():
