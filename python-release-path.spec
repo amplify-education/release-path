@@ -1,6 +1,7 @@
 Name: python-release-path
 Version: 0.2.0
-Release: %{getenv:BUILD_NUMBER}
+%define buildnumber %(echo "${BUILD_NUMBER:-dev}")
+Release: %{buildnumber}
 Summary: Tools for managing a release-branch based git workflow
 License: MIT
 Group: Development/Libraries
